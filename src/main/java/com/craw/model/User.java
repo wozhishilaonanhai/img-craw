@@ -1,9 +1,14 @@
 package com.craw.model;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class User {
+    private static final Pattern WB_USER_ID_REX = Pattern.compile("/u/(\\d+)");
 
+    private String wbUserId;
     private String img;
     private String imgId;
     private String name;
@@ -13,6 +18,24 @@ public class User {
     private String constellation;
     private List<String> tags;
     private String detailsUrl;
+
+    public String getWbUserId() {
+        return wbUserId;
+    }
+
+    public void setWbUserId(String wbUserId) {
+        this.wbUserId = wbUserId;
+    }
+
+    public void initWbUserId() {
+        if (Objects.isNull(detailsUrl)) {
+            return;
+        }
+        Matcher matcher = WB_USER_ID_REX.matcher(detailsUrl);
+        if (matcher.find()) {
+            this.wbUserId = matcher.group(1);
+        }
+    }
 
     public String getImg() {
         return img;
