@@ -1,5 +1,8 @@
 package com.craw.task;
 
+import com.arronlong.httpclientutil.HttpClientUtil;
+import com.arronlong.httpclientutil.common.HttpConfig;
+import com.arronlong.httpclientutil.exception.HttpProcessException;
 import com.craw.common.Common;
 import com.craw.model.User;
 import com.craw.task.runnable.NameRunnable;
@@ -16,6 +19,8 @@ import java.util.concurrent.TimeUnit;
 public class UserInfoTask implements NameRunnable {
 
     private static final Logger logger = LoggerFactory.getLogger(UserInfoTask.class);
+
+    private static final String INFO_URL = "https://weibo.com/p/100505%s/info?mod=pedit_more";
 
     private final BlockingQueue<User> userInfoQueue;
 
@@ -34,5 +39,18 @@ public class UserInfoTask implements NameRunnable {
         Common.takeRun(userInfoQueue, getName(), 200, TimeUnit.MILLISECONDS, null, (user) -> {
 
         });
+    }
+
+    private void getUserInfoData(User user) {
+        String url = String.format(INFO_URL, user.getWbUserId());
+        try {
+            String res = HttpClientUtil.get(HttpConfig.custom().url(url).context(Common.getCookies().getContext()).headers(Common.getHeard().build()));
+            parseUserInfoHtml(res);
+        } catch (HttpProcessException e) {
+            logger.error("【{}】获取用户详细信息地址请求失败， user={}", getName(), user, e);
+        }
+    }
+
+    private void parseUserInfoHtml(String html) {
     }
 }

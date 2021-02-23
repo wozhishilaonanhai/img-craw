@@ -29,13 +29,18 @@ public class User {
     }
 
     public User initWbUserId() {
+        this.wbUserId = _getWbUserId();
+        return this;
+    }
+
+    private String _getWbUserId() {
         if (Objects.nonNull(detailsUrl)) {
             Matcher matcher = WB_USER_ID_REX.matcher(detailsUrl);
             if (matcher.find()) {
-                this.wbUserId = matcher.group(1);
+                return matcher.group(1);
             }
         }
-        return this;
+        return null;
     }
 
     public String getImg() {
@@ -57,7 +62,10 @@ public class User {
     }
 
     public User initImgId() {
-        this.imgId = UUID.randomUUID().toString().replace("-", "");
+        this.imgId = this.wbUserId;
+        if (Objects.isNull(this.imgId)) {
+            this.imgId = _getWbUserId();
+        }
         return this;
     }
 
