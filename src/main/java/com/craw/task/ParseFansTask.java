@@ -4,6 +4,8 @@ import com.craw.ShareStore;
 import com.craw.common.Common;
 import com.craw.model.Img;
 import com.craw.model.User;
+import com.craw.task.runnable.NameRunnable;
+import com.craw.task.runnable.StopRunnable;
 import com.google.gson.JsonObject;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -12,19 +14,18 @@ import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 解析粉丝列表任务
+ * 解析粉丝列表任务，并分发任务
  */
-public class ParseFansTask implements Runnable {
+public class ParseFansTask implements NameRunnable, StopRunnable {
 
     private static final Logger logger = LoggerFactory.getLogger(ParseFansTask.class);
 
@@ -37,82 +38,125 @@ public class ParseFansTask implements Runnable {
 
     // 并非严格要求必须最大数是maxCount。结果最多会比预期多一点而已
     private final int maxCount;
-    private int currentCount;
 
     public ParseFansTask(int maxCount,
                          BlockingQueue<String> dataQueue,
                          BlockingQueue<Img> imgDownQueue,
                          BlockingQueue<User> userInfoQueue,
                          BlockingQueue<String> notifyStopQueue) {
+        Objects.requireNonNull(dataQueue);
+        Objects.requireNonNull(imgDownQueue);
+        Objects.requireNonNull(userInfoQueue);
         this.maxCount = maxCount;
         this.dataQueue = dataQueue;
         this.imgDownQueue = imgDownQueue;
         this.userInfoQueue = userInfoQueue;
         this.notifyStopQueue = notifyStopQueue;
-        this.currentCount = 0;
+    }
+
+    @Override
+    public String getName() {
+        return "解析粉丝列表任务";
     }
 
     @Override
     public void run() {
-        while (!needStop()) {
+        Common.takeRun(dataQueue, getName(), 0, TimeUnit.SECONDS, this, (data) -> {
             try {
-                String data = dataQueue.poll(1, TimeUnit.SECONDS);
-                if (Objects.nonNull(data)) {
-                    logger.debug("【解析粉丝列表任务】收到解析任务 字符串大小 {}", data.length());
-                    parseFansListData(data);
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                logger.warn("【解析粉丝列表任务】中断任务...");
-                return;
+                this.parseFansListData(data);
+            } catch (Exception e) {
+                logger.error("【{}】发生意外，停止任务，并发送上层任务停止通知", getName(), e);
+                this.sendStopNotify();
             }
-        }
+        });
     }
 
-    private boolean needStop() {
-        boolean isNeed = this.currentCount > this.maxCount;
+    @Override
+    public boolean needStop() {
+        boolean isNeed = ShareStore.currentCountGet() > this.maxCount;
         if (isNeed && Objects.nonNull(this.notifyStopQueue)) {
-            this.notifyStopQueue.offer("stop");
+            logger.info("【{}】已达到指定任务数据，发送通知并停止本任务-------------------------------", getName());
+            this.sendStopNotify();
         }
         return isNeed;
     }
 
+    private void sendStopNotify() {
+        this.notifyStopQueue.offer("stop");
+    }
+
     private void parseFansListData(String data) {
+        parseFansHtml(data, user -> {
+            Img imgQ = new Img(user.getImg(), user.getImgId());
+            try {
+                while (!imgDownQueue.offer(imgQ, 2, TimeUnit.SECONDS)) {
+                    logger.warn("imgDownQueue 队列已满，正在等待重试入队");
+                }
+                while (!userInfoQueue.offer(user, 2, TimeUnit.SECONDS)) {
+                    logger.warn("userInfoQueue 队列已满，正在等待重试入队");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            ShareStore.currentCountIncrementAndGet();
+        });
+    }
+
+    private void parseFansHtml(String data, Consumer<User> each) {
         Matcher matcher = FANS_LIST_REX.matcher(data);
         if (matcher.find()) {
             String jsonData = matcher.group(1);
             JsonObject jsonObject = Common.json().fromJson(jsonData, JsonObject.class);
-            String htmlData = jsonObject.get("html").getAsString();
-            Document document = Jsoup.parse(htmlData);
-            List<User> userList = new ArrayList<>();
+            Document document = Jsoup.parse(jsonObject.get("html").getAsString());
             for (Element element : document.getElementsByClass("follow_item S_line2")) {
-                User user = new User();
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
                 Element modPic = element.getElementsByClass("mod_pic").get(0);
                 Element img = modPic.getElementsByTag("img").get(0);
                 Element nameElement = modPic.getElementsByTag("a").get(0);
-                user.setImg(img.attr("src"));
-                if (user.getImg().contains("default_avatar")) {
+                String src = img.attr("src");
+                String alt = img.attr("alt");
+                String href = nameElement.attr("href");
+                if (src.contains("default_avatar")) {
                     continue;
                 }
-                user.setImgId(UUID.randomUUID().toString().replace("-", ""));
-                user.setName(img.attr("alt"));
-                user.setDetailsUrl(nameElement.attr("href"));
-                user.initWbUserId();
-                Img imgQ = new Img(user.getImg(), user.getImgId());
-                imgDownQueue.offer(imgQ);
-                userInfoQueue.offer(user);
-                userList.add(user);
-                currentCount++;
+
+                if (each != null) {
+                    each.accept(new User()
+                            .setName(alt)
+                            .setDetailsUrl(href)
+                            .setImg(src)
+                            .initWbUserId()
+                            .initImgId());
+                }
             }
-            logger.info("【解析粉丝列表任务】当前总数 {}", currentCount);
-            Element wPages = document.getElementsByClass("W_pages").get(0);
-            Elements pageList = wPages.getElementsByClass("page S_txt1");
-            if (pageList.size() > 0) {
-                Element element = pageList.get(pageList.size() - 1);
-                String val = element.text();
-                ShareStore.setCurrentPageMaxSize(Integer.parseInt(val));
-                logger.info("【解析粉丝列表任务】当前总页数 {}", ShareStore.getCurrentPageMaxSize());
-            }
+            logger.info("【{}】当前总数 {}", getName(), ShareStore.currentCountGet());
+            setCurrentPage(document);
+        } else {
+            logger.error("【{}】html 解析失败，可能登录过期", getName());
         }
+    }
+
+    private void setCurrentPage(Document document) {
+        try {
+            Elements pageList = document.getElementsByClass("W_pages").get(0).getElementsByClass("page S_txt1");
+            if (pageList.size() > 0) {
+                ShareStore.setCurrentPageMaxSize(Integer.parseInt(pageList.get(pageList.size() - 1).text()));
+                logger.info("【{}】当前总页数 {}", getName(), ShareStore.getCurrentPageMaxSize());
+            }
+        } catch (Exception e) {
+            logger.error("【{}】获取当前总页数失败，忽略解析， 原总页数为 {}", getName(), ShareStore.getCurrentPageMaxSize());
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        LinkedBlockingQueue<String> queue = new LinkedBlockingQueue<>(22);
+        Thread.currentThread().interrupt();
+        boolean sss = queue.offer("ssss", 5, TimeUnit.SECONDS);
+        System.out.println(sss);
+        sss = queue.offer("ssss", 5, TimeUnit.SECONDS);
+        System.out.println(sss);
     }
 }

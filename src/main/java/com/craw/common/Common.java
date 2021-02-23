@@ -4,8 +4,11 @@ import com.arronlong.httpclientutil.common.HttpCookies;
 import com.arronlong.httpclientutil.common.HttpHeader;
 import com.arronlong.httpclientutil.common.util.PropertiesUtil;
 import com.craw.task.MainTask;
+import com.craw.task.runnable.StopRunnable;
 import com.google.gson.Gson;
 import org.apache.http.impl.cookie.BasicClientCookie;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -16,8 +19,11 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
-public class Common {
+public final class Common {
 
     private static final Properties properties = PropertiesUtil.getProperties("config.properties");
     private static final Gson gson = new Gson();
@@ -70,5 +76,36 @@ public class Common {
         URL resource = Common.class.getClassLoader().getResource(name);
         Objects.requireNonNull(resource);
         return resource.getPath().substring(1);
+    }
+
+    public static <T> void takeRun(BlockingQueue<T> queue, String taskName, int sleep, TimeUnit unit, StopRunnable stop, Consumer<T> run) {
+        Objects.requireNonNull(queue);
+        Objects.requireNonNull(run);
+        final Logger logger;
+        if (Objects.isNull(taskName)) {
+            taskName = Thread.currentThread().getName();
+            logger = LoggerFactory.getLogger(taskName);
+        } else {
+            logger = LoggerFactory.getLogger("com.craw.task." + taskName);
+        }
+
+        stop = Objects.isNull(stop) ? () -> false : stop;
+
+        while (!stop.needStop()) {
+            try {
+                T data = queue.poll(2, TimeUnit.SECONDS);
+                if (Objects.nonNull(data)) {
+                    logger.debug("【{}】收到任务 data = {}", taskName, data.toString().length() > 200 ? data.toString().substring(0, 200) : data.toString());
+                    run.accept(data);
+                    unit.sleep(sleep);
+                    continue;
+                }
+                logger.info("【{}】暂无任务...", taskName);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.warn("【{}】中断任务...", taskName);
+                return;
+            }
+        }
     }
 }

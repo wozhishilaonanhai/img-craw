@@ -6,38 +6,54 @@ import java.util.LinkedHashSet;
 import java.util.Spliterator;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * 固定值的队列
  * 如果队列满了，则自动踢出队列头部
+ * 只提供 offer contains size remainingCapacity 方法
  * 并且提供O(1)的判断值存在
  *
  * @param <T>
  */
 public class FixedSortQueue<T> extends ArrayBlockingQueue<T> {
 
-    private LinkedHashSet<T> indexSet;
+    private final LinkedHashSet<T> indexSet;
+
+    private final ReadWriteLock lock;
 
     public FixedSortQueue(int capacity) {
         super(capacity);
         indexSet = new LinkedHashSet<>();
+        this.lock = new ReentrantReadWriteLock();
     }
 
     @Override
     public boolean offer(T t) {
-        boolean offer = super.offer(t);
-        if (!offer) {
-            T poll = super.poll();
-            indexSet.remove(poll);
-            offer = super.offer(t);
+        lock.writeLock().lock();
+        try {
+            boolean offer = super.offer(t);
+            if (!offer) {
+                T poll = super.poll();
+                indexSet.remove(poll);
+                offer = super.offer(t);
+            }
+            indexSet.add(t);
+            return offer;
+        } finally {
+            lock.writeLock().unlock();
         }
-        indexSet.add(t);
-        return offer;
     }
 
     @Override
     public boolean contains(Object o) {
-        return indexSet.contains(o);
+        lock.readLock().lock();
+        try {
+            return indexSet.contains(o);
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     @Override
@@ -46,7 +62,7 @@ public class FixedSortQueue<T> extends ArrayBlockingQueue<T> {
     }
 
     @Override
-    public void put(T t) throws InterruptedException {
+    public void put(T t) {
         throw new UnsupportedOperationException();
     }
 
@@ -56,7 +72,7 @@ public class FixedSortQueue<T> extends ArrayBlockingQueue<T> {
     }
 
     @Override
-    public T take() throws InterruptedException {
+    public T take() {
         throw new UnsupportedOperationException();
     }
 

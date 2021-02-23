@@ -2,15 +2,17 @@ package com.craw;
 
 import com.craw.common.FixedSortQueue;
 
-import java.util.LinkedHashSet;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ShareStore {
+public final class ShareStore {
 
     private static final AtomicInteger currentPageMaxSize = new AtomicInteger(10000);
+    // 当前粉丝总数量
+    private static final AtomicInteger currentCount = new AtomicInteger(0);
 
-    // 全局粉丝数据 为了用于过滤重复
-    private static final FixedSortQueue<String> allFansSet = new FixedSortQueue<>(1000);
+    // 全局粉丝数据 为了用于过滤重复，大小并不等于currentCount
+    private static final BlockingQueue<String> allFansSet = new FixedSortQueue<>(1000);
 
     public static void setCurrentPageMaxSize(int val) {
         currentPageMaxSize.set(val);
@@ -26,5 +28,13 @@ public class ShareStore {
 
     public static void addFans(String userId) {
         allFansSet.offer(userId);
+    }
+
+    public static void currentCountIncrementAndGet() {
+        currentCount.incrementAndGet();
+    }
+
+    public static int currentCountGet() {
+        return currentCount.get();
     }
 }

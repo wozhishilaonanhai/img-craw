@@ -6,6 +6,7 @@ import com.arronlong.httpclientutil.common.HttpCookies;
 import com.arronlong.httpclientutil.exception.HttpProcessException;
 import com.craw.ShareStore;
 import com.craw.common.Common;
+import com.craw.task.runnable.NameRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,24 +15,20 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 负责获取粉丝地址，并分发任务
+ * 负责获取粉丝地址
  */
-public class MainTask implements Runnable {
+public class MainTask implements NameRunnable {
 
     private static final Logger logger = LoggerFactory.getLogger(MainTask.class);
 
     private static final String fansList = "https://weibo.com/p/1006052360812967/follow?pids=Pl_Official_HisRelation__61&relate=fans&ajaxpagelet=1&ajaxpagelet_v6=1&__ref=%2Fp%2F1006052360812967%2Ffollow%3Frelate%3Dfans%26page%3D2%23Pl_Official_HisRelation__61&_t=FM_161399559700341&page=";
     private static final HttpCookies cookies = Common.getCookies();
 
-    // 并非严格要求必须最大数是maxCount。结果最多会比预期多一点而已
-    private final int maxCount;
-
     private final BlockingQueue<String> finsDateQueue;
-    private BlockingQueue<String> stopQueue;
+    private final BlockingQueue<String> stopQueue;
 
     /**
      * 遍历粉丝列表地址
@@ -39,11 +36,15 @@ public class MainTask implements Runnable {
      * @param count         准备获取的粉丝数目
      * @param finsDateQueue 粉丝页面解析队列
      */
-    public MainTask(int count, BlockingQueue<String> finsDateQueue) {
+    public MainTask(BlockingQueue<String> finsDateQueue) {
         Objects.requireNonNull(finsDateQueue);
         this.finsDateQueue = finsDateQueue;
         this.stopQueue = new ArrayBlockingQueue<>(1);
-        this.maxCount = count;
+    }
+
+    @Override
+    public String getName() {
+        return "粉丝获取任务";
     }
 
     @Override
@@ -57,7 +58,7 @@ public class MainTask implements Runnable {
 
     private Optional<String> getFansList(int page) {
         try {
-            logger.info("【粉丝获取任务】准备查找第{}页粉丝列表", page);
+            logger.info("【{}】准备查找第{}页粉丝列表", getName(), page);
             return Optional.of(HttpClientUtil.get(HttpConfig.custom().url(fansList + page)
                     .context(cookies.getContext())
                     .headers(Common.getHeard().build())));
@@ -79,20 +80,16 @@ public class MainTask implements Runnable {
     }
 
     private boolean isStop() {
-        if (Objects.isNull(this.stopQueue)) {
-            return false;
-        }
         return !this.stopQueue.isEmpty();
     }
 
-    public BlockingQueue<String> getTopQueue() {
+    public BlockingQueue<String> getStopQueue() {
         return this.stopQueue;
     }
 
     public static void main(String[] args) throws IOException {
-        BlockingQueue<String> uiQ = new LinkedBlockingQueue<>();
-        MainTask mainTask = new MainTask(20, uiQ);
-        mainTask.run();
+//        BlockingQueue<String> uiQ = new LinkedBlockingQueue<>();
+//        MainTask mainTask = new MainTask(20, uiQ);
+//        mainTask.run();
     }
-
 }
