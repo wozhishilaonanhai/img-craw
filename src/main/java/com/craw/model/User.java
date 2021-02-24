@@ -1,12 +1,19 @@
 package com.craw.model;
 
+import com.craw.common.Common;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class User {
+public class User implements Cloneable {
+
+
     private static final Pattern WB_USER_ID_REX = Pattern.compile("/u/(\\d+)");
 
     private String wbUserId;
@@ -114,7 +121,23 @@ public class User {
         return this;
     }
 
+    public User initConstellation() {
+        if (Objects.isNull(birthday)) {
+            return this;
+        }
+        if (birthday.contains("座")) {
+            this.constellation = birthday;
+            return this;
+        }
+        LocalDate birthdayDate = LocalDate.parse(birthday, DateTimeFormatter.ofPattern("yyyy年M月d日"));
+        this.constellation = Common.ConstellationUtils.getConstellation(birthdayDate.getMonthValue(), birthdayDate.getDayOfMonth());
+        return this;
+    }
+
     public List<String> getTags() {
+        if (Objects.isNull(tags)) {
+            return Collections.emptyList();
+        }
         return tags;
     }
 
@@ -130,6 +153,22 @@ public class User {
     public User setDetailsUrl(String detailsUrl) {
         this.detailsUrl = detailsUrl;
         return this;
+    }
+
+    @Override
+    public User clone() {
+        User res = new User();
+        res.birthday = birthday; // 生日
+        res.constellation = constellation; // 星座
+        res.detailsUrl = detailsUrl; // 详情url
+        res.img = img; // 图片地址
+        res.imgId = imgId; // 图片id
+        res.name = name; // 昵称
+        res.sex = sex; // 性别
+        res.site = site; // 所在地
+        res.wbUserId = wbUserId; // 微博用户id
+        res.tags = Objects.nonNull(tags) ? new ArrayList<>(tags) : null; // 标签
+        return res;
     }
 
     @Override

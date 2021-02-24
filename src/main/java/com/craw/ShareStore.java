@@ -6,8 +6,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class ShareStore {
-
-    private static final AtomicInteger currentPageMaxSize = new AtomicInteger(10000);
+    // 每个线程最大页数可能不一样
+    private static final ThreadLocal<Integer> currentPageMaxSize = ThreadLocal.withInitial(() -> 6);
     // 当前粉丝总数量
     private static final AtomicInteger currentCount = new AtomicInteger(0);
 
