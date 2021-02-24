@@ -56,6 +56,9 @@ public class ImgTask implements NameRunnable {
     private void down(Img img) {
         String url = img.getImg();
         String fileName = img.getImgId() + ".jpg";
+        if (Files.exists(Paths.get(ROOT_PATH + fileName))) {
+            return;
+        }
         try (FileOutputStream saveStream = new FileOutputStream(ROOT_PATH + fileName)) {
             HttpClientUtil.down(HttpConfig.custom().headers(Common.getHeard().build()).url(url).context(Common.getCookies().getContext()).out(saveStream));
         } catch (IOException e) {

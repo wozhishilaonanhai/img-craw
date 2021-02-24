@@ -17,11 +17,12 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Objects;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class Common {
 
@@ -95,15 +96,15 @@ public final class Common {
             try {
                 T data = queue.poll(2, TimeUnit.SECONDS);
                 if (Objects.nonNull(data)) {
-                    logger.debug("【{}】收到任务 data = {}", taskName, data.toString().length() > 400 ? data.toString().substring(0, 400) : data.toString());
+                    logger.debug("{}【{}】收到任务 data = {}", Thread.currentThread().getName(), taskName, data.toString().length() > 400 ? data.toString().substring(0, 400) : data.toString());
                     run.accept(data);
                     unit.sleep(sleep);
                     continue;
                 }
-                logger.info("【{}】暂无任务...", taskName);
+                logger.info("{}【{}】暂无任务...", Thread.currentThread().getName(), taskName);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                logger.warn("【{}】中断任务...", taskName);
+                logger.warn("{}【{}】中断任务...", Thread.currentThread().getName(), taskName);
                 return;
             }
         }
@@ -120,5 +121,27 @@ public final class Common {
         public static String getConstellation(int month, int day) {
             return day < dayArr[month - 1] ? constellationArr[month - 1] : constellationArr[month];
         }
+    }
+
+    public static Optional<String> matcher(Pattern pattern, String data, int groupIndex) {
+        Matcher matcher = pattern.matcher(data);
+        if (matcher.find()) {
+            String res = matcher.group(groupIndex);
+            return Optional.of(strVal(res));
+        }
+        return Optional.empty();
+    }
+
+    public static List<String> matchers(Pattern pattern, String data, int groupIndex) {
+        Matcher matcher = pattern.matcher(data);
+        List<String> res = new ArrayList<>();
+        while (matcher.find()) {
+            String val = matcher.group(groupIndex);
+            if (Objects.isNull(val) || val.isEmpty()) {
+                continue;
+            }
+            res.add(val);
+        }
+        return res;
     }
 }

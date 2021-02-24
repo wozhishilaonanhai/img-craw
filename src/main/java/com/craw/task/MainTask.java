@@ -10,11 +10,16 @@ import com.craw.task.runnable.NameRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 负责获取粉丝地址
@@ -23,9 +28,10 @@ public class MainTask implements NameRunnable {
 
     private static final Logger logger = LoggerFactory.getLogger(MainTask.class);
 
-    private static final String fansList = "https://weibo.com/p/100605$$$$$$/follow?pids=Pl_Official_HisRelation__61&relate=fans&ajaxpagelet=1&ajaxpagelet_v6=1&__ref=%2Fp%2F100605$$$$$$%2Ffollow%3Frelate%3Dfans%26page%3D2%23Pl_Official_HisRelation__61&_t=FM_161399559700341&page=";
-    private static final HttpCookies cookies = Common.getCookies();
+    private static final String fansList = "https://weibo.com/p/$$$$$$/follow?relate=fans&ajaxpagelet=1&ajaxpagelet_v6=1&_t=FM_161399559700341&pids=$pids$&page=";
+    private static final Pattern PAGE_REX = Pattern.compile(">(\\d+?)<\\\\/a>");
 
+    private static final HttpCookies cookies = Common.getCookies();
     private final BlockingQueue<String> finsDatesQueue;
     private final BlockingQueue<String> finsSearchQueue;
     private final BlockingQueue<String> stopQueue;
@@ -52,9 +58,11 @@ public class MainTask implements NameRunnable {
     @Override
     public void run() {
         Common.takeRun(finsSearchQueue, getName(), 200, TimeUnit.MILLISECONDS, this::isStop, (wbId) -> {
+            ShareStore.setCurrentPageMaxSize(6);
             for (int page = 1; page < ShareStore.getCurrentPageMaxSize() && !isStop(); page++) {
                 String fansList = getFansList(wbId, page).orElseThrow(RuntimeException::new);
                 parseFansListData(fansList);
+                setCurrentPage(fansList);
                 sleep();
             }
         });
@@ -62,13 +70,29 @@ public class MainTask implements NameRunnable {
 
     private Optional<String> getFansList(String wbId, int page) {
         try {
-            logger.info("【{}】准备查找粉丝{} 的第{}页粉丝列表", getName(), wbId, page);
-            return Optional.of(HttpClientUtil.get(HttpConfig.custom().url(fansList.replace("$$$$$$", wbId) + page)
+            String url = fansList.replace("$$$$$$", wbId.substring(0, 16)) + page;
+            url = url.replace("$pids$", wbId.substring(17));
+            logger.info("【{}】准备查找粉丝{} 的第{}页粉丝列表 url={}", getName(), wbId, page, url);
+            return Optional.of(HttpClientUtil.get(HttpConfig.custom().url(url)
                     .context(cookies.getContext())
                     .headers(Common.getHeard().build())));
         } catch (HttpProcessException e) {
             return Optional.empty();
         }
+    }
+
+    private void setCurrentPage(String html) {
+        int allPage = 1;
+        try {
+            Matcher matcher = PAGE_REX.matcher(html);
+            while (matcher.find()) {
+                allPage = Integer.parseInt(matcher.group(1));
+            }
+        } catch (Exception e) {
+            logger.error("【{}】获取当前总页数失败，忽略解析， 原总页数为 {}", getName(), ShareStore.getCurrentPageMaxSize());
+        }
+        logger.info("【{}】当前总页数 {}", getName(), ShareStore.getCurrentPageMaxSize());
+        ShareStore.setCurrentPageMaxSize(Math.min(allPage, 6));
     }
 
     private void parseFansListData(String data) {
@@ -89,9 +113,5 @@ public class MainTask implements NameRunnable {
 
     public BlockingQueue<String> getStopQueue() {
         return this.stopQueue;
-    }
-
-    public static void main(String[] args) {
-        System.out.println(fansList.replace("$$$$$$", "2876037162"));
     }
 }

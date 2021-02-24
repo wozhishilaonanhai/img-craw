@@ -30,6 +30,10 @@ public final class ShareStore {
         allFansSet.offer(userId);
     }
 
+    public static int addFansSize() {
+        return allFansSet.size();
+    }
+
     public static void currentCountIncrementAndGet() {
         currentCount.incrementAndGet();
     }

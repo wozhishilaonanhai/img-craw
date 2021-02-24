@@ -28,8 +28,7 @@ import java.util.regex.Pattern;
 public class ParseFansTask implements NameRunnable, StopRunnable {
 
     private static final Logger logger = LoggerFactory.getLogger(ParseFansTask.class);
-
-    private static final Pattern FANS_LIST_REX = Pattern.compile("^<script>parent\\.FM\\.view\\((.*)\\)</script>$");
+    private static final Pattern FANS_LIST_REX = Pattern.compile("<script>parent\\.FM\\.view\\((.*\"domid\":\"Pl_Official_HisRelation__\\d+\".*)\\)</script>");
 
     private final BlockingQueue<String> dataQueue;
     private final BlockingQueue<Img> imgDownQueue;
@@ -90,6 +89,10 @@ public class ParseFansTask implements NameRunnable, StopRunnable {
 
     private void parseFansListData(String data) {
         parseFansHtml(data, user -> {
+            if (Objects.isNull(user.getWbUserId()) || ShareStore.isContainsFans(user.getWbUserId())) {
+                // 这里判断重复并不准确，多线程下可能失效，但错误数量不会多，可以忍受
+                return;
+            }
             Img imgQ = new Img(user.getImg(), user.getImgId());
             try {
                 while (!imgDownQueue.offer(imgQ, 2, TimeUnit.SECONDS)) {
@@ -98,13 +101,14 @@ public class ParseFansTask implements NameRunnable, StopRunnable {
                 while (!userInfoQueue.offer(user, 2, TimeUnit.SECONDS)) {
                     logger.warn("【{}】userInfoQueue 队列已满，正在等待重试入队", getName());
                 }
-                while (Objects.nonNull(user.getWbUserId()) && !finsSearchQueue.offer(user.getWbUserId(), 2, TimeUnit.SECONDS)) {
-                    logger.warn("【{}】finsSearchQueue 队列已满，正在等待重试入队", getName());
+                if (Objects.nonNull(user.getWbUserId()) && !finsSearchQueue.offer("100505" + user.getWbUserId() + "|" + "Pl_Official_HisRelation__59", 2, TimeUnit.SECONDS)) {
+                    logger.warn("【{}】finsSearchQueue 队列已满，停止入队", getName());
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
             }
+            ShareStore.addFans(user.getWbUserId());
             ShareStore.currentCountIncrementAndGet();
         });
     }
@@ -139,22 +143,8 @@ public class ParseFansTask implements NameRunnable, StopRunnable {
                 }
             }
             logger.info("【{}】当前总数 {}", getName(), ShareStore.currentCountGet());
-            setCurrentPage(document);
         } else {
-            logger.error("【{}】html 解析失败，可能登录过期", getName());
-        }
-    }
-
-    private void setCurrentPage(Document document) {
-        try {
-            Elements pageList = document.getElementsByClass("W_pages").get(0).getElementsByClass("page S_txt1");
-            if (pageList.size() > 0) {
-                ShareStore.setCurrentPageMaxSize(Integer.parseInt(pageList.get(pageList.size() - 1).text()));
-                logger.info("【{}】当前总页数 {}", getName(), ShareStore.getCurrentPageMaxSize());
-            }
-        } catch (Exception e) {
-            logger.error("【{}】获取当前总页数失败，忽略解析， 原总页数为 {}", getName(), ShareStore.getCurrentPageMaxSize());
-            this.sendStopNotify();
+            logger.error("【{}】html 解析失败，可能登录过期, 或地址id不正确", getName());
         }
     }
 

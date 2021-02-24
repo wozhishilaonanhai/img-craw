@@ -26,6 +26,36 @@ public class User implements Cloneable {
     private String constellation;
     private List<String> tags;
     private String detailsUrl;
+    private int fansNum;
+    private int attentionNum;
+    private int wbNum;
+
+    public int getAttentionNum() {
+        return attentionNum;
+    }
+
+    public User setAttentionNum(int attentionNum) {
+        this.attentionNum = attentionNum;
+        return this;
+    }
+
+    public int getWbNum() {
+        return wbNum;
+    }
+
+    public User setWbNum(int wbNum) {
+        this.wbNum = wbNum;
+        return this;
+    }
+
+    public int getFansNum() {
+        return fansNum;
+    }
+
+    public User setFansNum(int fansNum) {
+        this.fansNum = fansNum;
+        return this;
+    }
 
     public String getWbUserId() {
         return wbUserId;

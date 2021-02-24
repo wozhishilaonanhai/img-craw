@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 public class StoreTask implements NameRunnable {
 
     private static final Logger logger = LoggerFactory.getLogger(StoreTask.class);
-    private static final String SQL_FORMAT = "INSERT INTO `user` VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')";
+    private static final String SQL_FORMAT = "INSERT INTO `user` VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' , '%s', '%s')";
 
     private final BlockingQueue<User> userQueue;
 
@@ -70,7 +70,11 @@ public class StoreTask implements NameRunnable {
                     Common.strVal(user.getBirthday()),
                     Common.strVal(user.getConstellation()),
                     String.join(",", user.getTags().toArray(new String[]{})),
-                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd hh:mm:ss"))));
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd hh:mm:ss")),
+                    Common.strVal(user.getImg()),
+                    user.getFansNum(),
+                    user.getAttentionNum(),
+                    user.getWbNum()));
             conn.commit();
             if (res <= 0) {
                 logger.warn("【{}】数据存储失败 user={}", getName(), user);

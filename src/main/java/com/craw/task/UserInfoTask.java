@@ -14,6 +14,9 @@ import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -30,6 +33,7 @@ public class UserInfoTask implements NameRunnable {
     private static final String INFO_URL = "https://weibo.com/p/100505%s/info?mod=pedit_more";
 
     private static final Pattern EXTRACT_HTML = Pattern.compile("<script>FM\\.view\\((.*\"domid\":\"Pl_Official_PersonalInfo__57\".*)\\)</script>");
+    private static final Pattern FANS_NUMBERS = Pattern.compile("<strong.*?>(\\d+?)<");
 
     private final BlockingQueue<User> userInfoQueue;
     private final BlockingQueue<User> userStoreQueue;
@@ -49,15 +53,17 @@ public class UserInfoTask implements NameRunnable {
     @Override
     public void run() {
         Common.takeRun(userInfoQueue, getName(), 200, TimeUnit.MILLISECONDS, null, (user) -> {
-            String html = getUserInfoData(user).orElseThrow(RuntimeException::new);
-            User newUser = parseUserInfoHtml(html, user.clone());
             try {
+                String html = getUserInfoData(user).orElseThrow(RuntimeException::new);
+                User newUser = parseUserInfoHtml(html, user.clone());
                 while (!userStoreQueue.offer(newUser, 2, TimeUnit.SECONDS)) {
                     logger.warn("【{}】userStoreQueue 队列已满，正在等待重试入队", getName());
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 logger.error("【{}】中断任务", getName());
+            } catch (Exception e) {
+                logger.error("【{}】解析发生异常...", getName(), e);
             }
         });
     }
@@ -86,9 +92,24 @@ public class UserInfoTask implements NameRunnable {
                 setUser(cache, title.text(), val.text());
             }
             User newUser = setTags(Common.json().fromJson(Common.json().toJson(cache), User.class), document);
+            setFansOtherData(newUser, html);
             return newUser.initConstellation();
         }
         return user;
+    }
+
+    private static void setFansOtherData(User user, String html) {
+        List<String> matchers = Common.matchers(FANS_NUMBERS, html, 1);
+        if (matchers.size() < 3) {
+            return;
+        }
+        user.setAttentionNum(Integer.parseInt(matchers.get(0)));
+        user.setFansNum(Integer.parseInt(matchers.get(1)));
+        user.setWbNum(Integer.parseInt(matchers.get(2)));
+    }
+
+    public static void main(String[] args) throws IOException {
+        setFansOtherData(new User(), new String(Files.readAllBytes(Paths.get("D:\\project\\img-craw\\src\\main\\resources\\fx.html"))));
     }
 
     private void setUser(Map<String, String> user, String title, String val) {
