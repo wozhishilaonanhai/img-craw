@@ -4,6 +4,7 @@ import com.arronlong.httpclientutil.HttpClientUtil;
 import com.arronlong.httpclientutil.common.HttpConfig;
 import com.arronlong.httpclientutil.exception.HttpProcessException;
 import com.craw.common.Common;
+import com.craw.common.UserFilter;
 import com.craw.model.User;
 import com.craw.task.runnable.NameRunnable;
 import com.google.gson.JsonObject;
@@ -37,12 +38,15 @@ public class UserInfoTask implements NameRunnable {
 
     private final BlockingQueue<User> userInfoQueue;
     private final BlockingQueue<User> userStoreQueue;
+    private final BlockingQueue<String> finsSearchQueue;
 
-    public UserInfoTask(BlockingQueue<User> userInfoQueue, BlockingQueue<User> userStoreQueue) {
+    public UserInfoTask(BlockingQueue<User> userInfoQueue, BlockingQueue<User> userStoreQueue, BlockingQueue<String> finsSearchQueue) {
         Objects.requireNonNull(userInfoQueue);
         Objects.requireNonNull(userStoreQueue);
+        Objects.requireNonNull(finsSearchQueue);
         this.userInfoQueue = userInfoQueue;
         this.userStoreQueue = userStoreQueue;
+        this.finsSearchQueue = finsSearchQueue;
     }
 
     @Override
@@ -52,12 +56,19 @@ public class UserInfoTask implements NameRunnable {
 
     @Override
     public void run() {
-        Common.takeRun(userInfoQueue, getName(), 200, TimeUnit.MILLISECONDS, null, (user) -> {
+        Common.takeRun(userInfoQueue, getName(), 10, TimeUnit.MILLISECONDS, null, (user) -> {
             try {
                 String html = getUserInfoData(user).orElseThrow(RuntimeException::new);
                 User newUser = parseUserInfoHtml(html, user.clone());
+                if (UserFilter.isRubbishUser(newUser)) {
+                    // 垃圾用户
+                    return;
+                }
                 while (!userStoreQueue.offer(newUser, 2, TimeUnit.SECONDS)) {
                     logger.warn("【{}】userStoreQueue 队列已满，正在等待重试入队", getName());
+                }
+                if (newUser.getFansNum() > 0 && !finsSearchQueue.offer("100505" + newUser.getWbUserId() + "|" + "Pl_Official_HisRelation__59", 1, TimeUnit.SECONDS)) {
+                    logger.debug("【{}】finsSearchQueue 队列已满，停止入队", getName());
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -70,11 +81,14 @@ public class UserInfoTask implements NameRunnable {
 
     private Optional<String> getUserInfoData(User user) {
         String url = String.format(INFO_URL, user.getWbUserId());
+        long startTime = System.currentTimeMillis();
         try {
             return Optional.of(HttpClientUtil.get(HttpConfig.custom().url(url).context(Common.getCookies().getContext()).headers(Common.getHeard().build())));
         } catch (HttpProcessException e) {
             logger.error("【{}】获取用户详细信息地址请求失败， user={}", getName(), user, e);
             return Optional.empty();
+        } finally {
+            logger.debug("【{}】url={} 获取详情请求耗时 {}ms", getName(), url, System.currentTimeMillis() - startTime);
         }
     }
 

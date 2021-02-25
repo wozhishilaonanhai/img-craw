@@ -34,7 +34,6 @@ public class ParseFansTask implements NameRunnable, StopRunnable {
     private final BlockingQueue<Img> imgDownQueue;
     private final BlockingQueue<User> userInfoQueue;
     private final BlockingQueue<String> notifyStopQueue;
-    private final BlockingQueue<String> finsSearchQueue;
 
     // 并非严格要求必须最大数是maxCount。结果最多会比预期多一点而已
     private final int maxCount;
@@ -43,8 +42,7 @@ public class ParseFansTask implements NameRunnable, StopRunnable {
                          BlockingQueue<String> dataQueue,
                          BlockingQueue<Img> imgDownQueue,
                          BlockingQueue<User> userInfoQueue,
-                         BlockingQueue<String> notifyStopQueue,
-                         BlockingQueue<String> finsSearchQueue) {
+                         BlockingQueue<String> notifyStopQueue) {
         Objects.requireNonNull(dataQueue);
         Objects.requireNonNull(imgDownQueue);
         Objects.requireNonNull(userInfoQueue);
@@ -53,7 +51,6 @@ public class ParseFansTask implements NameRunnable, StopRunnable {
         this.imgDownQueue = imgDownQueue;
         this.userInfoQueue = userInfoQueue;
         this.notifyStopQueue = notifyStopQueue;
-        this.finsSearchQueue = finsSearchQueue;
     }
 
     @Override
@@ -98,11 +95,8 @@ public class ParseFansTask implements NameRunnable, StopRunnable {
                 while (!imgDownQueue.offer(imgQ, 2, TimeUnit.SECONDS)) {
                     logger.warn("【{}】imgDownQueue 队列已满，正在等待重试入队", getName());
                 }
-                while (!userInfoQueue.offer(user, 2, TimeUnit.SECONDS)) {
+                while (!userInfoQueue.offer(user, 20, TimeUnit.SECONDS)) {
                     logger.warn("【{}】userInfoQueue 队列已满，正在等待重试入队", getName());
-                }
-                if (Objects.nonNull(user.getWbUserId()) && !finsSearchQueue.offer("100505" + user.getWbUserId() + "|" + "Pl_Official_HisRelation__59", 2, TimeUnit.SECONDS)) {
-                    logger.warn("【{}】finsSearchQueue 队列已满，停止入队", getName());
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

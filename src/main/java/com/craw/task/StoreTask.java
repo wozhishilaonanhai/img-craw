@@ -70,7 +70,7 @@ public class StoreTask implements NameRunnable {
                     Common.strVal(user.getBirthday()),
                     Common.strVal(user.getConstellation()),
                     String.join(",", user.getTags().toArray(new String[]{})),
-                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd hh:mm:ss")),
+                    LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")),
                     Common.strVal(user.getImg()),
                     user.getFansNum(),
                     user.getAttentionNum(),
@@ -84,8 +84,5 @@ public class StoreTask implements NameRunnable {
         } catch (SQLException e) {
             logger.error("【{}】sql 存储异常 user={}", getName(), user, e);
         }
-    }
-
-    public static void main(String[] args) throws SQLException {
     }
 }

@@ -17,37 +17,20 @@ public class TaskBootstrap {
     }
 
     public void start() {
-        BlockingQueue<String> finsSearchQueue = new LinkedBlockingQueue<>(200);
+        BlockingQueue<String> finsSearchQueue = new LinkedBlockingQueue<>(100);
         BlockingQueue<String> finsDateQueue = new LinkedBlockingQueue<>(1000);
         BlockingQueue<Img> imgDownQueue = new LinkedBlockingQueue<>(1000);
-        BlockingQueue<User> userInfoQueue = new LinkedBlockingQueue<>(1000);
+        BlockingQueue<User> userInfoQueue = new LinkedBlockingQueue<>(2000);
         BlockingQueue<User> userStoreQueue = new LinkedBlockingQueue<>(1000);
 
-        finsSearchQueue.add("1006051642351362|Pl_Official_HisRelation__61");
+        finsSearchQueue.add("1003061192329374|Pl_Official_HisRelation__58");
         MainTask mainTask = new MainTask(finsSearchQueue, finsDateQueue);
-        ParseFansTask parseFansTask = new ParseFansTask(50000, finsDateQueue, imgDownQueue, userInfoQueue, mainTask.getStopQueue(), finsSearchQueue);
+        ParseFansTask parseFansTask = new ParseFansTask(500000, finsDateQueue, imgDownQueue, userInfoQueue, mainTask.getStopQueue());
         ImgTask imgTask = new ImgTask(imgDownQueue);
-        UserInfoTask userInfoTask = new UserInfoTask(userInfoQueue, userStoreQueue);
+        UserInfoTask userInfoTask = new UserInfoTask(userInfoQueue, userStoreQueue, finsSearchQueue);
         StoreTask storeTask = new StoreTask(userStoreQueue);
 
         ExecutorService service = Executors.newCachedThreadPool();
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
-        service.execute(mainTask);
         service.execute(mainTask);
 
         service.execute(parseFansTask);
@@ -55,41 +38,6 @@ public class TaskBootstrap {
 
         service.execute(imgTask);
 
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
-        service.execute(userInfoTask);
         service.execute(userInfoTask);
 
         service.execute(storeTask);
