@@ -48,7 +48,9 @@ public class TaskBootstrap {
                 logger.info("\n========队列监控=========\nfinsSearchQueue大小：{}\nfinsDateQueue大小：{}\nimgDownQueue大小：{}\nuserInfoQueue大小：{}\nuserStoreQueue大小：{}\nallFansSet大小：{}\n===================",
                         finsSearchQueue.size(), finsDateQueue.size(), imgDownQueue.size(), userInfoQueue.size(), userStoreQueue.size(), ShareStore.addFansSize());
                 try {
-                    TimeUnit.SECONDS.sleep(5);
+                    if (!Thread.currentThread().isInterrupted()) {
+                        TimeUnit.SECONDS.sleep(5);
+                    }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     logger.error("中断异常，监控关闭...");
