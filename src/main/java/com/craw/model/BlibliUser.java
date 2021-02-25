@@ -1,5 +1,9 @@
 package com.craw.model;
 
+import com.craw.common.Common;
+
+import java.util.Objects;
+
 public class BlibliUser {
 
     private String userId;
@@ -10,8 +14,51 @@ public class BlibliUser {
     private String img;
     private String imgId;
     private int level;
-    private int fansNum;
-    private int attentionNum;
+
+    private String allData;
+
+    private FansInfo fansInfo;
+
+    public FansInfo getFansInfo() {
+        return fansInfo;
+    }
+
+    public BlibliUser setFansInfo(FansInfo fansInfo) {
+        this.fansInfo = fansInfo;
+        return this;
+    }
+
+    public static class FansInfo {
+        private int fansNum;
+        private int attentionNum;
+
+        public int getFansNum() {
+            return fansNum;
+        }
+
+        public FansInfo setFansNum(int fansNum) {
+            this.fansNum = fansNum;
+            return this;
+        }
+
+        public int getAttentionNum() {
+            return attentionNum;
+        }
+
+        public FansInfo setAttentionNum(int attentionNum) {
+            this.attentionNum = attentionNum;
+            return this;
+        }
+    }
+
+    public String getAllData() {
+        return allData;
+    }
+
+    public BlibliUser setAllData(String allData) {
+        this.allData = allData;
+        return this;
+    }
 
     public String getUserId() {
         return userId;
@@ -58,6 +105,21 @@ public class BlibliUser {
         return this;
     }
 
+    public BlibliUser initConstellation() {
+        if (Objects.isNull(birthday)) {
+            return this;
+        }
+        String[] arr = birthday.split("-");
+        if (arr.length < 2) {
+            return this;
+        }
+        this.constellation = Common.ConstellationUtils.getConstellation(Integer.parseInt(arr[arr.length - 2]), Integer.parseInt(arr[arr.length - 1]));
+        return this;
+    }
+
+    public static void main(String[] args) {
+    }
+
     public String getImg() {
         return img;
     }
@@ -82,24 +144,6 @@ public class BlibliUser {
 
     public BlibliUser setLevel(int level) {
         this.level = level;
-        return this;
-    }
-
-    public int getFansNum() {
-        return fansNum;
-    }
-
-    public BlibliUser setFansNum(int fansNum) {
-        this.fansNum = fansNum;
-        return this;
-    }
-
-    public int getAttentionNum() {
-        return attentionNum;
-    }
-
-    public BlibliUser setAttentionNum(int attentionNum) {
-        this.attentionNum = attentionNum;
         return this;
     }
 }

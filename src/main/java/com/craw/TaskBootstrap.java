@@ -23,7 +23,7 @@ public class TaskBootstrap {
         BlockingQueue<User> userInfoQueue = new LinkedBlockingQueue<>(2000);
         BlockingQueue<User> userStoreQueue = new LinkedBlockingQueue<>(1000);
 
-        finsSearchQueue.add("1005051678105910|Pl_Official_HisRelation__59");
+        finsSearchQueue.add("1005051644395354|Pl_Official_HisRelation__59");
         MainTask mainTask = new MainTask(finsSearchQueue, finsDateQueue);
         ParseFansTask parseFansTask = new ParseFansTask(500000, finsDateQueue, imgDownQueue, userInfoQueue, mainTask.getStopQueue());
         ImgTask imgTask = new ImgTask(imgDownQueue);
@@ -38,6 +38,8 @@ public class TaskBootstrap {
 
         service.execute(imgTask);
 
+        service.execute(userInfoTask);
+        service.execute(userInfoTask);
         service.execute(userInfoTask);
 
         service.execute(storeTask);
