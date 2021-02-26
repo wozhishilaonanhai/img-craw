@@ -1,11 +1,19 @@
 package com.craw.common;
 
+import com.arronlong.httpclientutil.HttpClientUtil;
+import com.arronlong.httpclientutil.builder.HCB;
+import com.arronlong.httpclientutil.common.HttpConfig;
 import com.arronlong.httpclientutil.common.HttpCookies;
 import com.arronlong.httpclientutil.common.HttpHeader;
+import com.arronlong.httpclientutil.common.Utils;
 import com.arronlong.httpclientutil.common.util.PropertiesUtil;
+import com.arronlong.httpclientutil.exception.HttpProcessException;
 import com.craw.task.MainTask;
 import com.craw.task.runnable.StopRunnable;
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import org.apache.http.HttpHost;
+import org.apache.http.client.HttpClient;
 import org.apache.http.impl.cookie.BasicClientCookie;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,8 +34,10 @@ import java.util.regex.Pattern;
 
 public final class Common {
 
+    private static final Logger logger = LoggerFactory.getLogger(Common.class);
     private static final Properties properties = PropertiesUtil.getProperties("config.properties");
     private static final Gson gson = new Gson();
+    private ThreadLocal<Map<String, HttpClient>> clients = new ThreadLocal<>();
 
     public static HttpCookies getCookies() {
         HttpCookies cookies = HttpCookies.custom();
@@ -143,5 +153,47 @@ public final class Common {
             res.add(val);
         }
         return res;
+    }
+
+    public HttpClient getHttpClient(boolean ssl) {
+        Map<String, HttpClient> clientMap = clients.get();
+        if (Objects.isNull(clientMap)) {
+            HttpHost proxy = getProxy();
+            try {
+                clientMap = buildClients(proxy);
+            } catch (Exception e) {
+                Utils.errorException("创建https协议的HttpClient对象出错：{}", e);
+            }
+            clients.set(clientMap);
+        }
+        if (ssl) {
+            return clientMap.get("https");
+        } else {
+            return clientMap.get("http");
+        }
+    }
+
+    private Map<String, HttpClient> buildClients(HttpHost httpHost) throws HttpProcessException {
+        Map<String, HttpClient> clientMap = new HashMap<>();
+        if (Objects.isNull(httpHost)) {
+            clientMap.put("http", HCB.custom().build());
+            clientMap.put("https", HCB.custom().ssl().build());
+            return clientMap;
+        }
+        clientMap.put("http", HCB.custom().proxy(httpHost.getHostName(), httpHost.getPort()).build());
+        clientMap.put("https", HCB.custom().proxy(httpHost.getHostName(), httpHost.getPort()).ssl().build());
+        return clientMap;
+    }
+
+    private static HttpHost getProxy() {
+        try {
+            String res = HttpClientUtil.get(HttpConfig.custom().url("http://127.0.0.1:5010/get/"));
+            JsonObject json = Common.json().fromJson(res, JsonObject.class);
+            String[] proxy = json.get("proxy").getAsString().split(":");
+            return new HttpHost(proxy[0], Integer.parseInt(proxy[1]));
+        } catch (HttpProcessException e) {
+            logger.error("代理获取失败.....");
+            return null;
+        }
     }
 }

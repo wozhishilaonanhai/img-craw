@@ -1,13 +1,17 @@
 package com.craw.task;
 
 import com.arronlong.httpclientutil.HttpClientUtil;
+import com.arronlong.httpclientutil.builder.HCB;
 import com.arronlong.httpclientutil.common.HttpConfig;
 import com.arronlong.httpclientutil.exception.HttpProcessException;
 import com.craw.common.Common;
 import com.craw.common.UserFilter;
 import com.craw.model.User;
 import com.craw.task.runnable.NameRunnable;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import org.apache.http.HttpHost;
+import org.apache.http.impl.client.CloseableHttpClient;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -83,7 +87,8 @@ public class UserInfoTask implements NameRunnable {
         String url = String.format(INFO_URL, user.getWbUserId());
         long startTime = System.currentTimeMillis();
         try {
-            return Optional.of(HttpClientUtil.get(HttpConfig.custom().url(url).context(Common.getCookies().getContext()).headers(Common.getHeard().build())));
+            CloseableHttpClient build = HCB.custom().proxy("", 5).build();
+            return Optional.of(HttpClientUtil.get(HttpConfig.custom().client(build).url(url).context(Common.getCookies().getContext()).headers(Common.getHeard().build())));
         } catch (HttpProcessException e) {
             logger.error("【{}】获取用户详细信息地址请求失败， user={}", getName(), user, e);
             return Optional.empty();
@@ -120,10 +125,6 @@ public class UserInfoTask implements NameRunnable {
         user.setAttentionNum(Integer.parseInt(matchers.get(0)));
         user.setFansNum(Integer.parseInt(matchers.get(1)));
         user.setWbNum(Integer.parseInt(matchers.get(2)));
-    }
-
-    public static void main(String[] args) throws IOException {
-        setFansOtherData(new User(), new String(Files.readAllBytes(Paths.get("D:\\project\\img-craw\\src\\main\\resources\\fx.html"))));
     }
 
     private void setUser(Map<String, String> user, String title, String val) {
