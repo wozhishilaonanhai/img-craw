@@ -1,17 +1,14 @@
 package com.craw.task;
 
 import com.arronlong.httpclientutil.HttpClientUtil;
-import com.arronlong.httpclientutil.builder.HCB;
 import com.arronlong.httpclientutil.common.HttpConfig;
-import com.arronlong.httpclientutil.exception.HttpProcessException;
 import com.craw.common.Common;
+import com.craw.common.ProxyHolder;
 import com.craw.common.UserFilter;
+import com.craw.model.Img;
 import com.craw.model.User;
 import com.craw.task.runnable.NameRunnable;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import org.apache.http.HttpHost;
-import org.apache.http.impl.client.CloseableHttpClient;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -19,9 +16,6 @@ import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -42,15 +36,15 @@ public class UserInfoTask implements NameRunnable {
 
     private final BlockingQueue<User> userInfoQueue;
     private final BlockingQueue<User> userStoreQueue;
-    private final BlockingQueue<String> finsSearchQueue;
+    private final BlockingQueue<Img> imgDownQueue;
 
-    public UserInfoTask(BlockingQueue<User> userInfoQueue, BlockingQueue<User> userStoreQueue, BlockingQueue<String> finsSearchQueue) {
+    public UserInfoTask(BlockingQueue<User> userInfoQueue, BlockingQueue<User> userStoreQueue, BlockingQueue<Img> imgDownQueue) {
         Objects.requireNonNull(userInfoQueue);
         Objects.requireNonNull(userStoreQueue);
-        Objects.requireNonNull(finsSearchQueue);
+        Objects.requireNonNull(imgDownQueue);
         this.userInfoQueue = userInfoQueue;
         this.userStoreQueue = userStoreQueue;
-        this.finsSearchQueue = finsSearchQueue;
+        this.imgDownQueue = imgDownQueue;
     }
 
     @Override
@@ -71,8 +65,9 @@ public class UserInfoTask implements NameRunnable {
                 while (!userStoreQueue.offer(newUser, 2, TimeUnit.SECONDS)) {
                     logger.warn("【{}】userStoreQueue 队列已满，正在等待重试入队", getName());
                 }
-                if (newUser.getFansNum() > 0 && !finsSearchQueue.offer("100505" + newUser.getWbUserId() + "|" + "Pl_Official_HisRelation__59", 1, TimeUnit.SECONDS)) {
-                    logger.debug("【{}】finsSearchQueue 队列已满，停止入队", getName());
+                Img imgQ = new Img(user.getImg(), user.getImgId());
+                while (!imgDownQueue.offer(imgQ, 2, TimeUnit.SECONDS)) {
+                    logger.warn("【{}】imgDownQueue 队列已满，正在等待重试入队", getName());
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -87,11 +82,17 @@ public class UserInfoTask implements NameRunnable {
         String url = String.format(INFO_URL, user.getWbUserId());
         long startTime = System.currentTimeMillis();
         try {
-            CloseableHttpClient build = HCB.custom().proxy("", 5).build();
-            return Optional.of(HttpClientUtil.get(HttpConfig.custom().client(build).url(url).context(Common.getCookies().getContext()).headers(Common.getHeard().build())));
-        } catch (HttpProcessException e) {
-            logger.error("【{}】获取用户详细信息地址请求失败， user={}", getName(), user, e);
-            return Optional.empty();
+            return Optional.of(HttpClientUtil.get(HttpConfig.custom()
+                    .client(ProxyHolder.getHttpClient(url))
+                    .timeout(6000, true)
+                    .url(url)
+                    .context(Common.getCookies().getContext())
+                    .headers(Common.getHeard().build())));
+        } catch (Exception e) {
+            ProxyHolder.deleteRemoteProxy(ProxyHolder.getCurrentProxy());
+            ProxyHolder.initHttpClient();
+            logger.warn("【{}】 请求超时，重新获取代理...", getName());
+            return getUserInfoData(user);
         } finally {
             logger.debug("【{}】url={} 获取详情请求耗时 {}ms", getName(), url, System.currentTimeMillis() - startTime);
         }

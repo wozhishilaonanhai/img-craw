@@ -35,12 +35,12 @@ public class FansNumTask extends CheckTask {
 
     @Override
     public void run() {
-        Common.takeRun(fansNumQueue, getName(), 200, TimeUnit.MILLISECONDS, null, (user) -> {
+        Common.takeRun(fansNumQueue, getName(), Integer.parseInt(Common.getPropertiesKey("task.sleep.blibli.fansNumTask", "2000")), TimeUnit.MILLISECONDS, null, (user) -> {
             String url = String.format(INFO_URL, user.getUserId());
             try {
                 String data = getData(url).orElseThrow(Exception::new);
                 JsonObject json = checkData(data, user.getUserId());
-                if (Objects.isNull(json)){
+                if (Objects.isNull(json)) {
                     return;
                 }
                 setUser(json, user);

@@ -10,9 +10,6 @@ import com.craw.task.runnable.NameRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -29,7 +26,9 @@ public class MainTask implements NameRunnable {
     private static final Logger logger = LoggerFactory.getLogger(MainTask.class);
 
     private static final String fansList = "https://weibo.com/p/$$$$$$/follow?relate=fans&ajaxpagelet=1&ajaxpagelet_v6=1&_t=FM_161399559700341&pids=$pids$&page=";
+    private static final String attentionList = "https://weibo.com/p/$$$$$$/follow?page=";
     private static final Pattern PAGE_REX = Pattern.compile(">(\\d+?)<\\\\/a>");
+    private static final ThreadLocal<Integer> errCount = ThreadLocal.withInitial(() -> 0);
 
     private static final HttpCookies cookies = Common.getCookies();
     private final BlockingQueue<String> finsDatesQueue;
@@ -69,6 +68,7 @@ public class MainTask implements NameRunnable {
     }
 
     private Optional<String> getFansList(String wbId, int page) {
+        long start = System.currentTimeMillis();
         try {
             String url = fansList.replace("$$$$$$", wbId.substring(0, 16)) + page;
             url = url.replace("$pids$", wbId.substring(17));
@@ -78,6 +78,8 @@ public class MainTask implements NameRunnable {
                     .headers(Common.getHeard().build())));
         } catch (HttpProcessException e) {
             return Optional.empty();
+        } finally {
+            logger.info("{}【{}】 请求耗时 {}ms wbId={} page={}", Thread.currentThread().getName(), getName(), System.currentTimeMillis() - start, wbId, page);
         }
     }
 

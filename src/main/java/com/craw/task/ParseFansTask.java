@@ -30,7 +30,6 @@ public class ParseFansTask implements NameRunnable, StopRunnable {
     private static final Pattern FANS_LIST_REX = Pattern.compile("<script>parent\\.FM\\.view\\((.*\"domid\":\"Pl_Official_HisRelation__\\d+\".*)\\)</script>");
 
     private final BlockingQueue<String> dataQueue;
-    private final BlockingQueue<Img> imgDownQueue;
     private final BlockingQueue<User> userInfoQueue;
     private final BlockingQueue<String> notifyStopQueue;
 
@@ -39,15 +38,12 @@ public class ParseFansTask implements NameRunnable, StopRunnable {
 
     public ParseFansTask(int maxCount,
                          BlockingQueue<String> dataQueue,
-                         BlockingQueue<Img> imgDownQueue,
                          BlockingQueue<User> userInfoQueue,
                          BlockingQueue<String> notifyStopQueue) {
         Objects.requireNonNull(dataQueue);
-        Objects.requireNonNull(imgDownQueue);
         Objects.requireNonNull(userInfoQueue);
         this.maxCount = maxCount;
         this.dataQueue = dataQueue;
-        this.imgDownQueue = imgDownQueue;
         this.userInfoQueue = userInfoQueue;
         this.notifyStopQueue = notifyStopQueue;
     }
@@ -89,11 +85,7 @@ public class ParseFansTask implements NameRunnable, StopRunnable {
                 // 这里判断重复并不准确，多线程下可能失效，但错误数量不会多，可以忍受
                 return;
             }
-            Img imgQ = new Img(user.getImg(), user.getImgId());
             try {
-                while (!imgDownQueue.offer(imgQ, 2, TimeUnit.SECONDS)) {
-                    logger.warn("【{}】imgDownQueue 队列已满，正在等待重试入队", getName());
-                }
                 while (!userInfoQueue.offer(user, 20, TimeUnit.SECONDS)) {
                     logger.warn("【{}】userInfoQueue 队列已满，正在等待重试入队", getName());
                 }
@@ -102,7 +94,6 @@ public class ParseFansTask implements NameRunnable, StopRunnable {
                 return;
             }
             ShareStore.addFans(user.getWbUserId());
-            ShareStore.currentCountIncrementAndGet();
         });
     }
 

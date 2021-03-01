@@ -28,15 +28,13 @@ public class ImgTask implements NameRunnable {
     private static final String ROOT_PATH;
 
     static {
-        String resourcePath = ImgTask.class.getResource("").getPath().substring(1);
-        int index = resourcePath.indexOf("target");
-        ROOT_PATH = resourcePath.substring(0, index) + "img_down" + File.separator + "blibli" + File.separator;
+        ROOT_PATH = Common.getPropertiesKey("img.down.path") ;
         Path path = Paths.get(ROOT_PATH);
         if (Files.notExists(path)) {
             try {
-                Files.createDirectory(path);
+                Files.createDirectories(path);
             } catch (IOException e) {
-                logger.error("img_down 文件夹不存在，并且创建失败，系统退出");
+                logger.error("img_down 文件夹不存在，并且创建失败，系统退出 path={}",path.toString());
                 System.exit(1);
             }
         }
@@ -54,6 +52,8 @@ public class ImgTask implements NameRunnable {
     }
 
     private void down(Img img) {
+        if (true)
+            return;
         String url = img.getImg();
         String fileName = img.getImgId() + ".jpg";
         if (Files.exists(Paths.get(ROOT_PATH + fileName))) {

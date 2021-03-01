@@ -2,8 +2,8 @@ package com.craw.task.blibli;
 
 import com.arronlong.httpclientutil.HttpClientUtil;
 import com.arronlong.httpclientutil.common.HttpConfig;
-import com.arronlong.httpclientutil.exception.HttpProcessException;
 import com.craw.common.Common;
+import com.craw.common.ProxyHolder;
 import com.craw.task.runnable.NameRunnable;
 import com.google.gson.JsonObject;
 import com.mysql.cj.exceptions.DataConversionException;
@@ -16,14 +16,41 @@ public abstract class CheckTask implements NameRunnable {
 
     private static final Logger logger = LoggerFactory.getLogger(CheckTask.class);
 
-    protected Optional<String> getData(String url) {
+    private static final ThreadLocal<Integer> errCount = ThreadLocal.withInitial(() -> 0);
+
+    protected Optional<String> getData(String url, boolean isProxy) {
+        long start = System.currentTimeMillis();
         try {
             logger.debug("【{}】准备请求 url={}", getName(), url);
-            return Optional.of(HttpClientUtil.get(HttpConfig.custom().url(url)
-                    .headers(Common.getHeard().build())));
-        } catch (HttpProcessException e) {
-            return Optional.empty();
+            if (isProxy) {
+                return Optional.of(HttpClientUtil
+                        .get(HttpConfig.custom().url(url)
+                                .client(ProxyHolder.getHttpClient(url))
+                                .timeout(10000, true)
+                                .headers(Common.getHeard().build())));
+            } else {
+                return Optional.of(HttpClientUtil.get(HttpConfig.custom().url(url).headers(Common.getHeard().build())));
+            }
+        } catch (Exception e) {
+            if (isProxy) {
+                ProxyHolder.deleteRemoteProxy(ProxyHolder.getCurrentProxy());
+                ProxyHolder.initHttpClient();
+                if (errCount.get() > 10) {
+                    return Optional.empty();
+                }
+                errCount.set(errCount.get());
+                logger.warn("【{}】 请求超时，重新获取代理...", getName());
+                return getData(url, true);
+            } else {
+                return Optional.empty();
+            }
+        } finally {
+            logger.debug("【{}】 请求耗时 {}ms url = {}", getName(), System.currentTimeMillis() - start, url);
         }
+    }
+
+    protected Optional<String> getData(String url) {
+        return getData(url, false);
     }
 
     protected JsonObject checkData(String data, String userId) {

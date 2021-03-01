@@ -4,6 +4,7 @@ import com.arronlong.httpclientutil.HttpClientUtil;
 import com.arronlong.httpclientutil.common.HttpConfig;
 import com.arronlong.httpclientutil.exception.HttpProcessException;
 import com.craw.common.Common;
+import com.craw.common.ProxyHolder;
 import com.craw.model.Img;
 import com.craw.task.runnable.NameRunnable;
 import org.slf4j.Logger;
@@ -28,9 +29,7 @@ public class ImgTask implements NameRunnable {
     private static final String ROOT_PATH;
 
     static {
-        String resourcePath = ImgTask.class.getResource("").getPath().substring(1);
-        int index = resourcePath.indexOf("target");
-        ROOT_PATH = resourcePath.substring(0, index) + "img_down" + File.separator;
+        ROOT_PATH = Common.getPropertiesKey("img.down.path");
         Path path = Paths.get(ROOT_PATH);
         if (Files.notExists(path)) {
             try {
@@ -40,6 +39,11 @@ public class ImgTask implements NameRunnable {
                 System.exit(1);
             }
         }
+    }
+
+    public static void main(String[] args) {
+        System.out.println(ImgTask.class.getResource(""));
+        System.out.println(ImgTask.class.getClassLoader().getResource(""));
     }
 
     private final BlockingQueue<Img> imgDownQueue;

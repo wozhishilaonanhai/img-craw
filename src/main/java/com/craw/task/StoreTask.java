@@ -1,6 +1,7 @@
 package com.craw.task;
 
 import com.alibaba.druid.pool.DruidDataSourceFactory;
+import com.craw.ShareStore;
 import com.craw.common.Common;
 import com.craw.model.User;
 import com.craw.task.runnable.NameRunnable;
@@ -13,7 +14,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -26,6 +26,7 @@ public class StoreTask implements NameRunnable {
     private static final String SQL_FORMAT = "INSERT INTO `user` VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' , '%s', '%s')";
 
     private final BlockingQueue<User> userQueue;
+    private final BlockingQueue<String> finsSearchQueue;
 
     private static DataSource dataSource;
 
@@ -35,16 +36,15 @@ public class StoreTask implements NameRunnable {
 
     private static void init() {
         try {
-            Properties properties = new Properties();
-            properties.load(StoreTask.class.getClassLoader().getResourceAsStream("druid.properties"));
-            dataSource = DruidDataSourceFactory.createDataSource(properties);
+            dataSource = DruidDataSourceFactory.createDataSource(Common.getProperties());
         } catch (Exception e) {
             logger.error("【信息存储任务】数据库初始化异常...");
         }
     }
 
-    public StoreTask(BlockingQueue<User> userQueue) {
+    public StoreTask(BlockingQueue<User> userQueue, BlockingQueue<String> finsSearchQueue) {
         this.userQueue = userQueue;
+        this.finsSearchQueue = finsSearchQueue;
     }
 
     @Override
@@ -80,9 +80,16 @@ public class StoreTask implements NameRunnable {
                 logger.warn("【{}】数据存储失败 user={}", getName(), user);
                 return;
             }
+            if (user.getFansNum() > 0 && !finsSearchQueue.offer("100505" + user.getWbUserId() + "|" + "Pl_Official_HisRelation__59", 2, TimeUnit.SECONDS)) {
+                logger.debug("【{}】finsSearchQueue 队列已满，停止入队", getName());
+            }
+            ShareStore.currentCountIncrementAndGet();
             logger.info("【{}】数据存储成功 userId = {}", getName(), user.getWbUserId());
         } catch (SQLException e) {
             logger.error("【{}】sql 存储异常 user={}", getName(), user, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.error("【{}】中断任务", getName());
         }
     }
 }

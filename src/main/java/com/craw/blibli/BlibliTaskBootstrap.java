@@ -1,5 +1,6 @@
 package com.craw.blibli;
 
+import com.craw.common.Common;
 import com.craw.model.BlibliUser;
 import com.craw.model.Img;
 import com.craw.task.blibli.FansNumTask;
@@ -21,13 +22,14 @@ public class BlibliTaskBootstrap {
         BlockingQueue<BlibliUser> userStoreQueue = new LinkedBlockingQueue<>(1000);
         BlockingQueue<Img> imgDownQueue = new LinkedBlockingQueue<>(1000);
 
-        MainTask mainTask = new MainTask(27104368, 27899757, fansNumQueue, userStoreQueue, null, imgDownQueue);
         FansNumTask fansNumTask = new FansNumTask(fansNumQueue, userStoreQueue);
         ImgTask imgTask = new ImgTask(imgDownQueue);
         StoreTask storeTask = new StoreTask(userStoreQueue);
 
         ExecutorService service = Executors.newCachedThreadPool();
-        service.execute(mainTask);
+        int startId = Integer.parseInt(Common.getPropertiesKey("blibli.userid.start", "51899757"));
+        int add = Integer.parseInt(Common.getPropertiesKey("blibli.userid.add", "800000"));
+        service.execute(new MainTask(startId, startId + add, fansNumQueue, userStoreQueue, null, imgDownQueue));
         service.execute(fansNumTask);
         service.execute(imgTask);
         service.execute(storeTask);

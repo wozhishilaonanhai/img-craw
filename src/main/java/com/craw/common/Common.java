@@ -1,29 +1,19 @@
 package com.craw.common;
 
-import com.arronlong.httpclientutil.HttpClientUtil;
-import com.arronlong.httpclientutil.builder.HCB;
-import com.arronlong.httpclientutil.common.HttpConfig;
 import com.arronlong.httpclientutil.common.HttpCookies;
 import com.arronlong.httpclientutil.common.HttpHeader;
-import com.arronlong.httpclientutil.common.Utils;
-import com.arronlong.httpclientutil.common.util.PropertiesUtil;
-import com.arronlong.httpclientutil.exception.HttpProcessException;
-import com.craw.task.MainTask;
 import com.craw.task.runnable.StopRunnable;
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import org.apache.http.HttpHost;
-import org.apache.http.client.HttpClient;
 import org.apache.http.impl.cookie.BasicClientCookie;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URISyntaxException;
+import java.io.InputStream;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
@@ -35,9 +25,28 @@ import java.util.regex.Pattern;
 public final class Common {
 
     private static final Logger logger = LoggerFactory.getLogger(Common.class);
-    private static final Properties properties = PropertiesUtil.getProperties("config.properties");
+    private static final Properties properties = new Properties();
+
+    static {
+        String confFile = System.getProperty("confFile");
+        InputStream configStream = Common.class.getClassLoader().getResourceAsStream(Objects.isNull(confFile) ? "config.properties" : confFile);
+        try {
+            if (configStream != null) {
+                properties.load(configStream);
+            } else {
+                if (Objects.nonNull(confFile)) {
+                    Path path = Paths.get(confFile);
+                    if (Files.exists(path)) {
+                        properties.load(Files.newInputStream(path));
+                    }
+                }
+            }
+        } catch (IOException e) {
+            logger.error("config 读取失败", e);
+        }
+    }
+
     private static final Gson gson = new Gson();
-    private ThreadLocal<Map<String, HttpClient>> clients = new ThreadLocal<>();
 
     public static HttpCookies getCookies() {
         HttpCookies cookies = HttpCookies.custom();
@@ -55,18 +64,23 @@ public final class Common {
 
     private static String _getCookies() {
         try {
-            URL resource = MainTask.class.getClassLoader().getResource("cookies.txt");
-            if (Objects.isNull(resource)) {
+            String cookiePath = Common.getPropertiesKey("cookies.path") + "cookies.txt";
+            Path path = Paths.get(cookiePath);
+            if (Files.notExists(path)) {
                 throw new FileNotFoundException("cookies 文件找不到");
             }
-            return new String(Files.readAllBytes(Paths.get(resource.toURI())), StandardCharsets.UTF_8);
-        } catch (IOException | URISyntaxException e) {
+            return new String(Files.readAllBytes(path));
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
     public static String getPropertiesKey(String key) {
         return properties.getProperty(key);
+    }
+
+    public static String getPropertiesKey(String key, String defaultVal) {
+        return properties.getProperty(key, defaultVal);
     }
 
     public static HttpHeader getHeard() {
@@ -87,6 +101,10 @@ public final class Common {
         URL resource = Common.class.getClassLoader().getResource(name);
         Objects.requireNonNull(resource);
         return resource.getPath().substring(1);
+    }
+
+    public static Properties getProperties() {
+        return properties;
     }
 
     public static <T> void takeRun(BlockingQueue<T> queue, String taskName, int sleep, TimeUnit unit, StopRunnable stop, Consumer<T> run) {
@@ -111,7 +129,7 @@ public final class Common {
                     unit.sleep(sleep);
                     continue;
                 }
-                logger.info("{}【{}】暂无任务...", Thread.currentThread().getName(), taskName);
+                logger.debug("{}【{}】暂无任务...", Thread.currentThread().getName(), taskName);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 logger.warn("{}【{}】中断任务...", Thread.currentThread().getName(), taskName);
@@ -155,45 +173,15 @@ public final class Common {
         return res;
     }
 
-    public HttpClient getHttpClient(boolean ssl) {
-        Map<String, HttpClient> clientMap = clients.get();
-        if (Objects.isNull(clientMap)) {
-            HttpHost proxy = getProxy();
-            try {
-                clientMap = buildClients(proxy);
-            } catch (Exception e) {
-                Utils.errorException("创建https协议的HttpClient对象出错：{}", e);
+    public static boolean isExceptions(Throwable ex, Class<? extends Throwable> target) {
+        Throwable exception = ex;
+        while (exception != null) {
+            if (target.isInstance(exception)) {
+                return true;
             }
-            clients.set(clientMap);
+            exception = exception.getCause();
         }
-        if (ssl) {
-            return clientMap.get("https");
-        } else {
-            return clientMap.get("http");
-        }
+        return false;
     }
 
-    private Map<String, HttpClient> buildClients(HttpHost httpHost) throws HttpProcessException {
-        Map<String, HttpClient> clientMap = new HashMap<>();
-        if (Objects.isNull(httpHost)) {
-            clientMap.put("http", HCB.custom().build());
-            clientMap.put("https", HCB.custom().ssl().build());
-            return clientMap;
-        }
-        clientMap.put("http", HCB.custom().proxy(httpHost.getHostName(), httpHost.getPort()).build());
-        clientMap.put("https", HCB.custom().proxy(httpHost.getHostName(), httpHost.getPort()).ssl().build());
-        return clientMap;
-    }
-
-    private static HttpHost getProxy() {
-        try {
-            String res = HttpClientUtil.get(HttpConfig.custom().url("http://127.0.0.1:5010/get/"));
-            JsonObject json = Common.json().fromJson(res, JsonObject.class);
-            String[] proxy = json.get("proxy").getAsString().split(":");
-            return new HttpHost(proxy[0], Integer.parseInt(proxy[1]));
-        } catch (HttpProcessException e) {
-            logger.error("代理获取失败.....");
-            return null;
-        }
-    }
 }

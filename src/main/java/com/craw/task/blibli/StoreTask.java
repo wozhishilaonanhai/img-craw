@@ -38,9 +38,7 @@ public class StoreTask implements NameRunnable {
 
     private static void init() {
         try {
-            Properties properties = new Properties();
-            properties.load(StoreTask.class.getClassLoader().getResourceAsStream("druid.properties"));
-            dataSource = DruidDataSourceFactory.createDataSource(properties);
+            dataSource = DruidDataSourceFactory.createDataSource(Common.getProperties());
         } catch (Exception e) {
             logger.error("【信息存储任务】数据库初始化异常...");
         }

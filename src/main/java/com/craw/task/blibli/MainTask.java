@@ -1,5 +1,6 @@
 package com.craw.task.blibli;
 
+import com.craw.common.Common;
 import com.craw.model.BlibliUser;
 import com.craw.model.Img;
 import com.craw.task.runnable.StopRunnable;
@@ -56,7 +57,7 @@ public class MainTask extends CheckTask implements StopRunnable {
                 if (have(i)) {
                     continue;
                 }
-                TimeUnit.MILLISECONDS.sleep(1500);
+                TimeUnit.MILLISECONDS.sleep(Integer.parseInt(Common.getPropertiesKey("task.sleep.blibli","3000")));
 
                 String url = String.format(USER_INFO_URL, i);
                 String res = getData(url).orElseThrow(Exception::new);
